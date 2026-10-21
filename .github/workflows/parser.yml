@@ -1,0 +1,41 @@
+name: Parser (hybrid)
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: sy-pipeline-db
+  cancel-in-progress: false
+
+jobs:
+  parse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r worker/requirements.txt
+
+      - name: Apply DB migrations
+        env:
+          SHOTIBLOF_GITHUB_TOKEN: ${{ secrets.SHOTIBLOF_GITHUB_TOKEN }}
+          PIPELINE_DB_GITHUB_REPO: shotiblof/sy-pipeline-db
+          PIPELINE_DB_LOCAL_DIR: /tmp/sy-pipeline-db
+        working-directory: worker
+        run: python apply_sy_migrations.py
+
+      - name: Run strip2+hotscope hybrid parser
+        env:
+          SHOTIBLOF_GITHUB_TOKEN: ${{ secrets.SHOTIBLOF_GITHUB_TOKEN }}
+          PIPELINE_DB_GITHUB_REPO: shotiblof/sy-pipeline-db
+          PIPELINE_DB_LOCAL_DIR: /tmp/sy-pipeline-db
+          PARSER_MODE: full
+          PARSER_MAX_PARSED_QUEUE: "120"
+          PIPELINE_PROFILE: turbo
+        working-directory: worker
+        run: python run_sy_parser.py

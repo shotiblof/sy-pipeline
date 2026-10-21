@@ -1,0 +1,46 @@
+name: Uploader
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: sy-pipeline-db
+  cancel-in-progress: false
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+
+      - name: Install dependencies
+        run: pip install -r worker/requirements.txt
+
+      - name: Apply DB migrations
+        env:
+          SHOTIBLOF_GITHUB_TOKEN: ${{ secrets.SHOTIBLOF_GITHUB_TOKEN }}
+          PIPELINE_DB_GITHUB_REPO: shotiblof/sy-pipeline-db
+          PIPELINE_DB_LOCAL_DIR: /tmp/sy-pipeline-db
+        working-directory: worker
+        run: python apply_sy_migrations.py
+
+      - name: Run sy hybrid upload worker
+        env:
+          SHOTIBLOF_GITHUB_TOKEN: ${{ secrets.SHOTIBLOF_GITHUB_TOKEN }}
+          PIPELINE_DB_GITHUB_REPO: shotiblof/sy-pipeline-db
+          PIPELINE_DB_LOCAL_DIR: /tmp/sy-pipeline-db
+          PYTHONUNBUFFERED: "1"
+          PIPELINE_PROFILE: turbo
+          UPLOADER_MAX_PER_RUN: "2"
+          NAMEVIDS_DAILY_CAP: "200"
+          UPLOADER_GAP_SEC: "30"
+        working-directory: worker
+        run: python run_sy_uploader.py
